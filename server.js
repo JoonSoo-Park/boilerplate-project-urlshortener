@@ -6,6 +6,7 @@ const app = express();
 const mongoose = require('mongoose');
 const dns = require('dns');
 const stringHash = require("string-hash");
+var validUrl = require('valid-url');
 
 // Basic Configuration
 const port = process.env.PORT || 3000;
@@ -32,39 +33,37 @@ app.get('/', function(req, res) {
 
 app.post('/api/shorturl/new', function(req, res) {
   const newUrl = req.body.url;
-
   // https:?// ignore case
-  const REPLACE_REGEX = /^https?:\/\//i
+  // const REPLACE_REGEX = /^https?:\/\//i
+  // const urlToCheck = newUrl.replace(REPLACE_REGEX, '');
 
-  const urlToCheck = newUrl.replace(REPLACE_REGEX, '');
-
-  dns.lookup(urlToCheck, function(err, addresses, family) {
-    if (err) {
-      res.json({error: "Invalid URL"});
-    } else {
-      Url.findOne({original_url: urlToCheck}, function(err, data) {
-        if (err) {
-          res.send(err);
-        } else {
-          if (data) {
+  if (validUrl.isUri(newUrl)) {
+    Url.findOne({original_url: newUrl}, function(err, data) {
+      if (err) {
+        res.json(err);
+      } else {
+        if (!data) {
+          const newObject = new Url({
+            original_url: newUrl,
+            short_url: stringHash(newUrl)
+          });
+          newObject.save(function(err, data) {
             res.json({
-              "original_url": data.original_url,
-              "short_url": data.short_url
+             original_url: data["original_url"],
+             short_url: data["short_url"]
             });
-          } else {
-            const newObject = new Url({
-              original_url: urlToCheck,
-              short_url: stringHash(urlToCheck)
-            });
-
-            newObject.save(); 
-          }
+          }); 
+        } else {
+          res.json({
+            original_url: data["original_url"],
+            short_url: data["short_url"]
+          });
         }
-      });
-    }
-  });
-
-  // res.redirect('/');
+      }
+    });
+  } else {
+    res.json({error: "Invalid Url"});
+  }
 });
 
 app.get('/api/shorturl/:shortUrl', function(req, res) {
@@ -74,7 +73,7 @@ app.get('/api/shorturl/:shortUrl', function(req, res) {
     if (err) {
       res.json({error: "No short URL found for the given input"});
     } else {
-      res.redirect('https://' + data["original_url"]);
+      res.redirect(data["original_url"]);
     }
   });
 });
