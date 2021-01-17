@@ -2,12 +2,12 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const app = express();
 const mongoose = require('mongoose');
 const dns = require('dns');
 const stringHash = require("string-hash");
-var validUrl = require('valid-url');
+const validUrl = require('valid-url');
 
+const app = express();
 // Basic Configuration
 const port = process.env.PORT || 3000;
 
@@ -24,6 +24,37 @@ const urlSchema = new mongoose.Schema({
 
 const Url = mongoose.model("Url", urlSchema);
 
+const saveNewUrl = function(res, newUrl) {
+  const newObject = new Url({
+    original_url: newUrl,
+    short_url: stringHash(newUrl)
+  });
+
+  newObject.save(function(err, data) {
+    res.json({
+      original_url: data["original_url"],
+      short_url: data["short_url"]
+    });
+  });
+}
+
+const findMatchingOne = function(res, newUrl, callback) {
+  Url.findOne({original_url: newUrl}, function(err, data) {
+    if (err) {
+      res.json(err);
+    }
+
+    if (data) {
+      res.json({
+        original_url: data["original_url"],
+        short_url: data["short_url"]
+      });
+    } else {
+      callback(res, newUrl);
+    }
+  });
+}
+
 app.get('/', function(req, res) {
   Url.find({}, function(err, data) {
     console.log(data);
@@ -33,34 +64,9 @@ app.get('/', function(req, res) {
 
 app.post('/api/shorturl/new', function(req, res) {
   const newUrl = req.body.url;
-  // https:?// ignore case
-  // const REPLACE_REGEX = /^https?:\/\//i
-  // const urlToCheck = newUrl.replace(REPLACE_REGEX, '');
 
   if (validUrl.isWebUri(newUrl)) {
-    Url.findOne({original_url: newUrl}, function(err, data) {
-      if (err) {
-        res.json(err);
-      } else {
-        if (!data) {
-          const newObject = new Url({
-            original_url: newUrl,
-            short_url: stringHash(newUrl)
-          });
-          newObject.save(function(err, data) {
-            res.json({
-             original_url: data["original_url"],
-             short_url: data["short_url"]
-            });
-          }); 
-        } else {
-          res.json({
-            original_url: data["original_url"],
-            short_url: data["short_url"]
-          });
-        }
-      }
-    });
+    findMatchingOne(res, newUrl, saveNewUrl);
   } else {
     res.json({error: "invalid URL"});
   }
