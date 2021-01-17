@@ -37,7 +37,7 @@ app.post('/api/shorturl/new', function(req, res) {
   // const REPLACE_REGEX = /^https?:\/\//i
   // const urlToCheck = newUrl.replace(REPLACE_REGEX, '');
 
-  if (validUrl.isUri(newUrl)) {
+  if (validUrl.isWebUri(newUrl)) {
     Url.findOne({original_url: newUrl}, function(err, data) {
       if (err) {
         res.json(err);
